@@ -35,55 +35,6 @@ class Item:
             self.last_sold_time = datetime_formatted(market_data['lastSoldTime'])
             self.bidding_info = self._extract_bidding_info()
 
-    def get_min_listed_and_max_bidder(self) -> dict:
-        '''
-        Returns the minimum price that the item is listed at, and the quantity (if they exist).
-        '''
-        compare_price_listed = self.price_max # Price to compare to
-        min_list_price = None # Lowest price in which the item is available, if it exists
-        min_list_count = None # Quantity available at lowest price, if it exists
-
-        compare_price_bid = self.price_min # Price to compare to
-        max_bid_price = None # Greatest price in which there is a bidder for the item, if it exists
-        max_bid_count = None # Number of bidders at the max bid price, if it exists
-
-        for price_point in self.bidding_info:
-            if price_point['sellers'] != 0 and price_point['price'] <= compare_price_listed:
-                compare_price_listed = price_point['price']
-                min_list_price = price_point['price']
-                min_list_count = price_point['sellers']
-
-            if price_point['buyers'] != 0 and price_point['price'] >= compare_price_bid:
-                compare_price_bid = price_point['price']
-                max_bid_price = price_point['price']
-                max_bid_count = price_point['buyers']
-            
-
-        return {'min_list_price': min_list_price, 'min_list_count': min_list_count, \
-                'max_bid_price': max_bid_price, 'max_bid_count': max_bid_count}
-
-    def deliverable(self) -> str:
-        '''
-        Returns market summary of item, to be sent as an embed to Discord.
-        '''
-        bidding_info = self.get_min_listed_and_max_bidder()
-        listed = f"{bidding_info['min_list_count']:,} listed @{bidding_info['min_list_price']:,}" if bidding_info['min_list_price'] is not None else "N/A"
-        
-        order = "order" if bidding_info['max_bid_count'] is not None and bidding_info['max_bid_count'] == 1 else "orders"
-        bid = f"{bidding_info['max_bid_count']:,} {order} @{bidding_info['max_bid_price']:,}" if bidding_info['max_bid_price'] is not None else "N/A"
-        
-        name = f"{self.enhancement_level.upper()}: {self.name}" if self.enhancement_level is not None else self.name
-
-        s = f"Item: **{name}**\n"\
-            f"Listed: **{self.current_stock:,}**\n"\
-            f"Base Price: **{self.base_price:,}**\n"\
-            f"Last sold time: **{self.last_sold_time} EDT**\n"\
-            f"Last sold price: **{self.last_sold_price:,}**\n\n"\
-            f"Min price available: **{listed}**\n"\
-            f"Max price bidder(s): **{bid}**\n\n"\
-        
-        return s
-
     def _extract_market_data(self, response: list) -> dict:
         '''
         Takes response and puts data into a dictionary.
@@ -133,47 +84,6 @@ class Craftable(Item):
 
         self.mastery = self._mastery_bracket(mastery)
         self.verbose = verbose
-
-    def deliverable(self) -> str:
-        '''
-        Formats final recipe info string to be delivered as discord embed
-        '''
-        # Emotes
-        item_value, cheapest_recipe, lowest_price = self._get_item_value_and_cheapest_recipe()
-        profitability = item_value - lowest_price
-        profit_emote = ':x:' if profitability < 0 else ':white_check_mark:'
-
-        mastery_text = f"(per craft @{int(float(self.mastery))} mastery)" if 'Elixir' in self.category or 'Food' in self.category else ''
-
-        all_ingredients = [ingredient.name for recipe_number in self.recipes for ingredient in self.recipes[recipe_number].recipe]
-        longest_string = max(len(ingredient) for ingredient in all_ingredients)
-
-        deliverable = f"Item: **{self.name} ({self.last_sold_price:,})**\n" if self.verbose else f"Item: **{self.name}**\n"
-        deliverable += "Higher grade item: **N/A**\n" if not self.higher_grade.name else f"Higher grade item: **{self.higher_grade.name}**"
-        deliverable += "\n" if not self.higher_grade.name or not self.verbose else f" **({self.higher_grade.price:,})**\n"
-        deliverable += f"Profit margin: **{int(profitability):,}** {profit_emote} {mastery_text}\n\n"
-
-        deliverable += "**Recipes**\n"
-
-        for recipe_number, recipe in self.recipes.items():
-            deliverable += f"```Recipe {recipe_number}*:\n" if int(recipe_number) == cheapest_recipe else f"```Recipe {recipe_number}:\n"
-
-            for ingredient, quantity in recipe.recipe.items():
-                deliverable += f"{ingredient.name.ljust(longest_string, '.')} x{quantity} ({ingredient.price:,})\n" if self.verbose else \
-                                f"{ingredient.name.ljust(longest_string, '.')} x{quantity}\n"
-
-            deliverable += "```\n"
-
-        if self.substitutions:
-            deliverable += "**Substitutions**\n"
-
-        for ingredient_group, substitutes in self.substitutions.items():
-            deliverable += f"```{ingredient_group}:\n"
-            for substitute in substitutes:
-                deliverable += f"    {substitute}\n"
-            deliverable += "```\n"
-        
-        return deliverable
 
     def _mastery_bracket(self, mastery: int) -> str:
         '''
