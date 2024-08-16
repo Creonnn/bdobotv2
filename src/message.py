@@ -1,6 +1,6 @@
 
-from market_recipe import Item, Craftable
-from market_recipe_helpers import cooking_mastery_dict, cooking_exceptions,alchemy_mastery_dict, alchemy_exceptions
+from item import Item, Craftable
+from helper import cooking_mastery_dict, cooking_exceptions,alchemy_mastery_dict, alchemy_exceptions
 from typing import Union
 
 class Message:
@@ -85,7 +85,6 @@ class Craftable(Message):
 
         deliverable = self._name_text(item)
         deliverable += self._higher_grade_text(item)
-        deliverable += self._higher_grade_text(item)
         deliverable += self._profit_margin_text(profitability, profit_emote, mastery_text)
         deliverable += "**Recipes**\n"
         deliverable += self._recipe_text(item, longest_string, cheapest_recipe)
@@ -139,21 +138,6 @@ class Craftable(Message):
     def _longest_string(self, item: Item) -> int:
         all_ingredients = [ingredient.name for recipe_number in item.recipes for ingredient in item.recipes[recipe_number].recipe]
         return max(len(ingredient) for ingredient in all_ingredients)
-
-    def _mastery_bracket(self, mastery: int) -> str:
-        '''
-        Gets the mastery bracket based on a number.
-        Mastery brackets range from 0 to 2000, at intervals of 50.
-        Returns str instead of int/float because MongoDB only allows str as keys.
-        '''
-        floor = 0
-        if mastery >= 2000:
-            mastery = 2000
-        elif mastery <= 0:
-            mastery = 0
-        else:
-            floor = mastery % 50
-        return str(float(mastery - floor))
     
     def _cooking_mastery(self, item: Item) -> tuple[dict, dict]:
         '''
@@ -192,7 +176,7 @@ class Craftable(Message):
         '''
         Returns the item value as a result from one cooking proc.
         '''
-        rates, mastery_multiplers = item._cooking_mastery()
+        rates, mastery_multiplers = self._cooking_mastery(item)
 
         reg_price = item.last_sold_price
         rare_price = 0 if item.higher_grade.name is None else item.higher_grade.last_sold_price
@@ -216,7 +200,7 @@ class Craftable(Message):
         '''
         Returns the item value as a result from one alchemy proc.
         '''
-        rates, mastery_multiplers = item._alchemy_mastery()
+        rates, mastery_multiplers = self._alchemy_mastery(item)
 
         reg_price = item.last_sold_price
         rare_price = 0 if item.higher_grade.name is None else item.higher_grade.last_sold_price
