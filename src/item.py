@@ -1,4 +1,4 @@
-from market_recipe_helpers import *
+from helper import *
 from search import *
 from typing import Union
 
@@ -17,6 +17,7 @@ class Item:
         else:
             self.enhancement_level = search.get_enhancement_level(user_input)
             search_result = search.find_item(user_input, exact, data)
+            print(search_result)
 
             self.id = list(search_result.keys())[0]
             self.name = list(search_result.values())[0]
@@ -189,126 +190,6 @@ class Craftable(Item):
             floor = mastery % 50
         return str(float(mastery - floor))
     
-    def _cooking_mastery(self) -> tuple[dict, dict]:
-        '''
-        Returns average cooking rates based on cooking mastery.
-        '''
-        name = self.name.lower()
-        mastery_mult = cooking_mastery_dict[self.mastery]
-
-        # For items with proc exceptions
-        if name in cooking_exceptions.keys():
-            return cooking_exceptions[name], mastery_mult
-        
-        return {'reg_base': 2.5, 'reg_mult': 1.5, 'rare_base': 1.5, 'rare_mult': 0.5, 'rare_proc_base_chance': 0.2}, mastery_mult
-
-    def _alchemy_mastery(self) -> tuple[dict, dict]:
-        '''
-        Returns average alchemy rates based on alchemy mastery.
-        '''
-        name = self.name.lower()
-        mastery_mult = alchemy_mastery_dict[self.mastery]
-
-        # For items with different proc rates than the norm
-        if name in alchemy_exceptions.keys():
-            return alchemy_exceptions[name], mastery_mult
-
-        # For items that can only proc once per craft
-        elif 'perfume' in name or 'draught' in name or 'deep sea' in name or\
-            'indignation' in name or 'khalk' in name or 'sturdy whale tendon elixir' == name or\
-            'sturdy whale tendon potion' == name or 'elixir of regeneration' == name or\
-            ("party" in name and "harmony" in name):
-            return {'reg_base': 1, 'reg_mult': 0, 'rare_base': 0, 'rare_mult': 0}, mastery_mult
-        
-        return {'reg_base': 2.5, 'reg_mult': 1.5, 'rare_base': 0.3, 'rare_mult': 0}, mastery_mult
-    
-    def _get_cooking_item_value(self) -> Union[int, float]:
-        '''
-        Returns the item value as a result from one cooking proc.
-        '''
-        rates, mastery_multiplers = self._cooking_mastery()
-
-        reg_price = self.last_sold_price
-        rare_price = 0 if self.higher_grade.name is None else self.higher_grade.last_sold_price
-
-        reg_base_proc = rates['reg_base']
-        reg_additional_proc = rates['reg_mult']
-        reg_additional_proc_chance = mastery_multiplers["Regular Max Proc Chance"]
-
-        rare_base_proc = rates['rare_base']
-        rare_additional_proc = rates['rare_mult']
-        rare_additional_proc_chance = mastery_multiplers["Regular Max Proc Chance"]
-        rare_proc_base_chance = rates['rare_proc_base_chance']
-        rare_proc_additional_chance = mastery_multiplers['Rare Add. Chance']
-
-        item_value = reg_price * (reg_base_proc + reg_additional_proc * reg_additional_proc_chance) + \
-        rare_price * (rare_base_proc + rare_additional_proc * rare_additional_proc_chance) * (rare_proc_base_chance + rare_proc_additional_chance)
-        
-        return item_value
-    
-    def _get_alchemy_item_value(self) -> Union[int, float]:
-        '''
-        Returns the item value as a result from one alchemy proc.
-        '''
-        rates, mastery_multiplers = self._alchemy_mastery()
-
-        reg_price = self.last_sold_price
-        rare_price = 0 if self.higher_grade.name is None else self.higher_grade.last_sold_price
-
-        reg_base_proc = rates['reg_base']
-        reg_max_proc_multiplier = rates['reg_mult']
-        reg_max_proc_chance_multiplier = mastery_multiplers["Max Proc Chance"]
-
-        rare_base_proc = rates['rare_base']
-
-
-        item_value = reg_price * (reg_base_proc + reg_max_proc_multiplier * reg_max_proc_chance_multiplier) +\
-                    rare_price * (rare_base_proc)
-
-        return item_value
-    
-    def _get_cheapest_recipe(self) -> tuple[str, Union[int, float]]:
-        '''
-        Returns the cheapest recipe and the cost of the recipe, given a list of different recipes that crafts the same item.
-        '''
-        cheapest_recipe = None
-        lowest_price = None
-        compare_price = 0
-
-        for recipe_number in self.recipes:
-
-            for ingredient, quantity in self.recipes[recipe_number].recipe.items():
-                compare_price += quantity * ingredient.price
-
-            if lowest_price is None:
-                cheapest_recipe = recipe_number
-                lowest_price = compare_price
-
-            elif compare_price < lowest_price:
-                cheapest_recipe = recipe_number
-                lowest_price = compare_price
-            compare_price = 0
-
-        return cheapest_recipe, lowest_price
-    
-    def _get_item_value_and_cheapest_recipe(self) -> tuple[Union[int, float], Union[int, float], Union[int, float]]:
-        '''
-        Gets price of item, the cheapest recipe to craft the item (if there are multiple recipes), and the cost of using cheapest recipe.
-        '''
-        cheapest_recipe, lowest_price = self._get_cheapest_recipe()
-        if self.category == 'Food':
-            item_value = self._get_cooking_item_value()
-                
-        elif 'elixir' in self.category.lower():
-            item_value = self._get_alchemy_item_value()
-
-        elif self.category == 'Material':
-            item_value = 0 if self.name is None else self.last_sold_price * 2.5
-
-        else:
-            item_value = 0 if self.name is None else self.last_sold_price
-
-        return item_value, cheapest_recipe, lowest_price
     
 class Vendor(Item):
 
@@ -347,7 +228,7 @@ class Recipe:
                 self.recipe[ingredient_item] = quantity
                 continue
 
-            if ingredient not in all_name_to_id:
+            if ingredient.lower() not in [name.lower() for name in all_name_to_id]:
                 ingredient_item = Drop(ingredient)
                 self.recipe[ingredient_item] = quantity
                 continue
